@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分镜台 · Storyboard Board</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --txt:#e6e9ef; --muted:#8a93a3; --accent:#6c8cff; --accent2:#ff8c6c;
+    --ok:#46c98b; --doing:#f0b429; --todo:#5b6577; --danger:#ff5c72;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--txt); font-size:14px; line-height:1.5;
+  }
+  header{
+    display:flex; align-items:center; gap:14px; padding:14px 18px;
+    border-bottom:1px solid var(--line); background:var(--panel);
+    position:sticky; top:0; z-index:20;
+  }
+  header .logo{font-size:18px; font-weight:700; letter-spacing:.5px}
+  header .logo small{color:var(--muted); font-weight:400; font-size:12px; margin-left:6px}
+  #projTitle{
+    background:transparent; border:none; color:var(--txt); font-size:15px;
+    border-bottom:1px dashed transparent; padding:4px 6px; min-width:160px; flex:1; max-width:360px;
+  }
+  #projTitle:focus{outline:none; border-bottom-color:var(--line)}
+  .stats{display:flex; gap:8px; margin-left:auto; flex-wrap:wrap}
+  .stat{background:var(--panel2); border:1px solid var(--line); border-radius:20px; padding:4px 12px; font-size:12px; color:var(--muted)}
+  .stat b{color:var(--txt)}
+  .toolbar{display:flex; gap:8px; padding:10px 18px; border-bottom:1px solid var(--line); background:var(--bg); flex-wrap:wrap; align-items:center}
+  .toolbar.sub{justify-content:flex-end; padding:8px 18px}
+  button{
+    background:var(--panel2); color:var(--txt); border:1px solid var(--line);
+    border-radius:8px; padding:7px 13px; cursor:pointer; font-size:13px; transition:.15s;
+  }
+  button:hover{border-color:var(--accent); color:#fff}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  button.primary:hover{filter:brightness(1.1)}
+  button.ghost{background:transparent}
+  .layout{display:block; height:calc(100vh - 117px)}
+  @media(max-width:820px){
+    /* Header 紧凑 */
+    header{padding:10px 12px; flex-wrap:wrap; gap:8px}
+    header .logo{font-size:16px}
+    #projTitle{font-size:15px; min-width:120px; max-width:none; flex:1 1 100%; order:2; padding:6px 0; border-bottom:1px solid var(--line)}
+
+    /* 统计变卡片 */
+    .stats{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; width:100%; order:3; margin:0}
+    .stat{padding:6px 2px; font-size:10.5px; text-align:center; border-radius:10px}
+    .stat b{font-size:13px; display:block; margin-top:2px}
+
+    /* 工具栏横向滚动 */
+    .toolbar{padding:8px 10px; gap:5px; overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch}
+    .toolbar button{padding:8px 10px; font-size:12px; white-space:nowrap; min-height:40px}
+
+    /* 整体布局 */
+    .layout{height:auto}
+
+    .board-pane{padding:10px 12px 20px; overflow-x:auto; -webkit-overflow-scrolling:touch}
+
+    .grid{grid-template-columns:1fr; gap:10px; max-width:none}
+    .c-ops button, .c-ops .dh{padding:3px 5px; font-size:11px; margin-left:2px}
+    .c-ops .dh{display:none}
+    .storyboard-table{font-size:12px}
+    .storyboard-table thead th, .storyboard-table tbody td{padding:8px 8px}
+    .storyboard-table .c-time{width:66px}
+    .storyboard-table{min-width:860px}
+
+    /* 弹窗全屏 */
+    .overlay{padding:0; align-items:stretch}
+    .modal{max-width:none; max-height:none; height:100vh; height:100dvh; width:100vw; border-radius:0; border:none; padding:16px; overflow-y:auto}
+    .modal h3{font-size:18px}
+    .modal-actions{padding-bottom:24px}
+    .modal-actions button{flex:1; min-height:48px}
+
+    .field input, .field textarea, .field select{min-height:44px}
+    .field textarea{min-height:80px}
+    .filterbar select, input, textarea, select{font-size:16px}
+    button{min-height:40px}
+  }
+  .board-pane{overflow:auto; padding:16px 18px; min-height:0}
+  .filterbar{display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap}
+  .filterbar .fb-label{font-size:12px; color:var(--muted)}
+  .filterbar select{background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:6px 10px; font-size:13px}
+  .filterbar select:focus{outline:none; border-color:var(--accent)}
+  .filterbar .fb-info{font-size:12px; color:var(--muted); margin-left:auto}
+  .hint-sm{font-size:11.5px; color:var(--muted); margin:8px 0 0; line-height:1.5}
+  .empty{color:var(--muted); text-align:center; padding:60px 20px; border:1px dashed var(--line); border-radius:var(--radius); margin-top:20px}
+  .storyboard-table{
+    width:100%; border-collapse:separate; border-spacing:0;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    overflow:hidden; font-size:12.5px;
+  }
+  .storyboard-table thead th{
+    background:var(--panel2); color:var(--muted); font-weight:600; font-size:11.5px;
+    text-align:left; padding:8px 8px; border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:2; white-space:nowrap;
+  }
+  .storyboard-table tbody td{
+    padding:8px 8px; border-bottom:1px solid var(--line); vertical-align:top;
+    color:var(--txt); line-height:1.55;
+  }
+  .storyboard-table tbody tr{position:relative; transition:.12s}
+  .storyboard-table tbody tr:hover{background:rgba(108,140,255,.06)}
+  .storyboard-table tbody tr:last-child td{border-bottom:none}
+  .storyboard-table .c-num{width:36px; text-align:center; font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; position:relative}
+  .storyboard-table .c-time{width:62px; white-space:nowrap; font-variant-numeric:tabular-nums}
+  .storyboard-table .c-camera{width:112px}
+  .storyboard-table .c-focal{width:62px}
+  .storyboard-table .c-jingbie{width:70px}
+  .storyboard-table .c-pos{width:74px}
+  .storyboard-table .c-move{width:62px}
+  .storyboard-table .c-extra{width:96px}
+  .img-cell{width:96px; height:54px; border:1px dashed var(--line); border-radius:6px; overflow:hidden; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px; background:var(--panel2); transition:.12s}
+  .img-cell:hover{border-color:var(--accent); color:var(--accent)}
+  .img-cell img{width:100%; height:100%; object-fit:cover; display:block}
+  .img-cell .img-ph{pointer-events:none}
+  /* 资产库 */
+  .ass-tabs{display:flex; gap:6px; margin:8px 0 14px; border-bottom:1px solid var(--line)}
+  .ass-tab{background:transparent; border:none; border-bottom:2px solid transparent; padding:8px 14px; cursor:pointer; color:var(--muted); font-size:13px; border-radius:0}
+  .ass-tab.active{color:var(--accent); border-bottom-color:var(--accent); background:transparent}
+  .asset-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; max-height:280px; overflow-y:auto; padding:4px}
+  .asset-card{position:relative; background:var(--panel2); border:1px solid var(--line); border-radius:8px; overflow:hidden; padding:8px}
+  .asset-card .asset-img{width:100%; height:90px; overflow:hidden; border-radius:6px; margin-bottom:6px}
+  .asset-card .asset-img img{width:100%; height:100%; object-fit:cover; display:block}
+  .asset-card .asset-name{font-size:12px; font-weight:600; word-break:break-all}
+  .asset-card .asset-desc{font-size:11px; color:var(--muted); margin-top:2px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+  .asset-card .asset-del{position:absolute; top:4px; right:4px; background:rgba(0,0,0,.7); color:#fff; border:none; border-radius:4px; padding:1px 6px; font-size:11px; cursor:pointer}
+  .ref-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px; max-height:180px; overflow-y:auto; padding:4px; background:var(--panel2); border:1px solid var(--line); border-radius:6px}
+  .asset-thumb{position:relative; cursor:pointer; border:2px solid var(--line); border-radius:6px; overflow:hidden; transition:.12s; height:74px}
+  .asset-thumb img{width:100%; height:100%; object-fit:cover; display:block}
+  .asset-thumb:hover{border-color:var(--accent)}
+  .asset-thumb.selected{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent) inset}
+  .asset-thumb .asset-cat-tag{position:absolute; top:2px; left:2px; background:rgba(0,0,0,.7); color:#fff; font-size:10px; padding:1px 5px; border-radius:3px}
+  .asset-thumb .asset-name-tag{position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.75); color:#fff; font-size:11px; padding:2px 4px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .storyboard-table .dragover td{background:rgba(108,140,255,.12)!important}
+  /* 行内编辑控件 */
+  .ed{
+    width:100%; background:transparent; border:none; color:inherit; font:inherit;
+    line-height:1.5; padding:2px 4px; margin:-2px -4px; border-radius:4px; outline:none;
+    font-family:inherit; resize:none; display:block; box-sizing:border-box;
+  }
+  .ed:hover{background:rgba(255,255,255,.04)}
+  .ed:focus{background:var(--panel2); box-shadow:0 0 0 1px var(--accent)}
+  textarea.ed{min-height:20px}
+  select.ed{cursor:pointer; appearance:none; -webkit-appearance:none; padding-right:10px;
+    background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+    background-position:calc(100% - 6px) 55%,calc(100% - 2px) 55%; background-size:4px 4px; background-repeat:no-repeat}
+  .move-eds{display:flex; flex-direction:column; gap:2px}
+  .move-eds select.ed{font-size:12px; padding:1px 4px}
+  .ed.t2{width:52px; display:inline-block; padding:2px 4px; font-size:12px; text-align:center}
+  /* 状态色条（可点击循环切换） */
+  .st-bar{position:absolute; left:0; top:4px; bottom:4px; width:4px; border-radius:0 3px 3px 0; cursor:pointer; transition:.12s; z-index:2}
+  .st-bar:hover{width:7px}
+  .st-bar.bar-todo{background:var(--todo)}
+  .st-bar.bar-doing{background:var(--doing)}
+  .st-bar.bar-ok{background:var(--ok)}
+  .storyboard-table .c-ops{width:132px; text-align:right; white-space:nowrap}
+  .c-ops button, .c-ops .dh{
+    display:inline-flex; align-items:center; justify-content:center;
+    background:var(--panel2); border:1px solid var(--line); color:var(--muted);
+    border-radius:5px; padding:2px 5px; font-size:11.5px; cursor:pointer; line-height:1.4;
+    margin-left:2px; vertical-align:middle;
+  }
+  .c-ops button:hover, .c-ops .dh:hover{border-color:var(--accent); color:var(--accent)}
+  .c-ops button.del:hover{border-color:var(--danger); color:var(--danger)}
+  .c-ops button.confirming, button.confirming{border-color:var(--danger)!important; color:var(--danger)!important; background:rgba(255,92,114,.12)!important; font-weight:600}
+  .c-ops .dh{cursor:grab; user-select:none; -webkit-user-select:none; font-size:13px}
+  .c-ops .dh:active{cursor:grabbing}
+  .dh.dragging{opacity:.4}
+  /* modal */
+.overlay{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:50; padding:20px}
+.overlay.show{display:flex}
+body.modal-open{overflow:hidden}
+  .modal{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); width:100%; max-width:560px; max-height:90vh; overflow:auto; padding:20px}
+  .modal h3{margin:0 0 16px}
+  .field{margin-bottom:12px}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:5px}
+  .field input,.field textarea,.field select{
+    width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--txt);
+    border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit;
+  }
+  .field textarea{resize:vertical; min-height:60px}
+  .field input:focus,.field textarea:focus,.field select:focus{outline:none; border-color:var(--accent)}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .modal-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:8px}
+  .thumb-pick{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .thumb-pick img{width:64px; height:48px; object-fit:cover; border-radius:6px; border:1px solid var(--line)}
+  .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--accent); color:#fff; padding:10px 18px; border-radius:10px; opacity:0; transition:.25s; z-index:100; pointer-events:none}
+  .toast.show{opacity:1}
+  /* 提示词库抽屉 */
+  .prompt-panel{position:fixed; top:0; right:0; bottom:0; width:280px; background:var(--panel); border-left:1px solid var(--line); z-index:40; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .25s; box-shadow:-6px 0 20px rgba(0,0,0,.35)}
+  .prompt-panel.open{transform:translateX(0)}
+  .pp-head{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--line); font-weight:600}
+  .pp-head button{background:transparent; border:none; color:var(--muted); cursor:pointer; font-size:13px}
+  .pp-list{flex:1; overflow-y:auto; padding:10px}
+  .pp-item{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 26px 8px 10px; margin-bottom:8px; cursor:grab; font-size:12.5px; word-break:break-word; position:relative}
+  .pp-item:hover{border-color:var(--accent)}
+  .pp-item .pp-del{position:absolute; top:4px; right:6px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; padding:2px 4px}
+  .pp-item .pp-del:hover{color:var(--danger)}
+  .pp-item.preset{padding-right:42px}
+  .pp-item .pp-badge{position:absolute; top:4px; right:6px; color:var(--muted); font-size:10px; background:var(--panel); padding:1px 5px; border-radius:4px}
+  .pp-item.preset{border-style:dashed}
+  .pp-sep{font-size:11px; color:var(--muted); margin:12px 0 6px; border-top:1px solid var(--line); padding-top:8px}
+  .pp-item.dragging{opacity:.4}
+  .pp-add{padding:10px 14px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:8px}
+  .pp-add textarea{width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; resize:vertical}
+  @media(max-width:820px){ .prompt-panel{width:100%} }
+  @media print{
+    header,.toolbar,.script-pane,.c-ops,.filterbar,.st-bar{display:none !important}
+    body{background:#fff; color:#000}
+    .layout{display:block; height:auto}
+    .board-pane{padding:0}
+    .storyboard-table{border:1px solid #999; background:#fff; color:#000; font-size:11px}
+    .storyboard-table thead th{background:#eee; color:#333; border-bottom:1px solid #999}
+    .storyboard-table tbody td{border-bottom:1px solid #ccc; color:#000}
+    .storyboard-table tbody tr{break-inside:avoid; page-break-inside:avoid}
+    .storyboard-table .c-num{color:#000}
+    .storyboard-table .ed{border:none!important; background:transparent!important; box-shadow:none!important; height:auto!important; padding:0!important; color:#000!important; appearance:none; -webkit-appearance:none}
+    .storyboard-table select.ed{background:none!important; color:#000!important}
+    .storyboard-table textarea.ed{min-height:0}
+    .storyboard-table .img-cell{border:1px solid #ccc; background:#fff}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🎬 分镜台</div>
+</header>
+
+<div class="toolbar">
+  <button class="primary" id="btnAdd">＋ 新增分镜</button>
+  <button id="btnPromptLib">💬 提示词库</button>
+  <button class="ghost" id="btnClear">🗑 清空</button>
+</div>
+<div class="toolbar sub" id="toolbar2">
+  <span class="fb-info"></span>
+  <button class="primary" id="btnFullPrompt">🧹 提示词整理</button>
+</div>
+
+<div class="layout">
+  <div class="board-pane">
+    <div class="filterbar" id="filterBar">
+      <span class="fb-label">筛选</span>
+      <select id="fFilterStatus">
+        <option value="">全部状态</option>
+        <option value="todo">待生成</option>
+        <option value="doing">生成中</option>
+        <option value="ok">已定稿</option>
+      </select>
+      <select id="fFilterJingbie">
+        <option value="">全部景别</option>
+        <option value="远景">远景</option>
+        <option value="全景">全景</option>
+        <option value="中景">中景</option>
+        <option value="近景">近景</option>
+        <option value="特写">特写</option>
+      </select>
+      <span id="filterInfo" class="fb-info"></span>
+    </div>
+    <table class="storyboard-table">
+      <thead>
+        <tr>
+          <th class="c-num">镜号</th>
+          <th class="c-time">时间(s)</th>
+          <th class="c-camera">相机</th>
+          <th class="c-focal">焦段</th>
+          <th class="c-jingbie">景别</th>
+          <th class="c-pos">机位</th>
+          <th class="c-move">运镜</th>
+          <th class="c-desc">画面描述</th>
+          <th class="c-extra">补充提示词</th>
+          <th class="c-ops"></th>
+        </tr>
+      </thead>
+      <tbody id="board"></tbody>
+    </table>
+    <div id="emptyHint" class="empty">还没有分镜。点「＋ 新增分镜」开始，或先在左侧写脚本再「智能拆分」。</div>
+  </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="modalTitle">新增分镜</h3>
+    <div class="field">
+      <label>标题</label>
+      <input id="fTitle" placeholder="如：清晨窗前" />
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>开始时间（秒）</label>
+        <input id="fStart" type="number" min="0" step="0.1" placeholder="0" />
+      </div>
+      <div class="field">
+        <label>结束时间（秒）</label>
+        <input id="fEnd" type="number" min="0" step="0.1" placeholder="3" />
+      </div>
+    </div>
+    <div class="field">
+      <label>画面描述</label>
+      <textarea id="fDesc" placeholder="镜头里看到了什么"></textarea>
+    </div>
+    <div class="field">
+      <label>人物</label>
+      <input id="fChar" placeholder="镜头里出现的人物" />
+    </div>
+    <div class="field">
+      <label>台词 / 旁白</label>
+      <textarea id="fLine" placeholder="这一镜说的话 / 屏幕上打的字"></textarea>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>景别</label>
+        <select id="fJingbie">
+          <option value="">—</option>
+          <option value="远景">远景</option>
+          <option value="全景">全景</option>
+          <option value="中景">中景</option>
+          <option value="近景">近景</option>
+          <option value="特写">特写</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>运镜</label>
+        <select id="fMove">
+          <option value="">—</option>
+          <option value="固定">固定</option>
+          <option value="推">推</option>
+          <option value="拉">拉</option>
+          <option value="摇">摇</option>
+          <option value="移">移</option>
+          <option value="跟">跟</option>
+          <option value="升降">升降</option>
+          <option value="环绕">环绕</option>
+          <option value="变焦">变焦</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>角度</label>
+        <select id="fAngle">
+          <option value="">—</option>
+          <option value="平视">平视</option>
+          <option value="俯拍">俯拍</option>
+          <option value="仰拍">仰拍</option>
+          <option value="斜拍">斜拍</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>转场</label>
+        <select id="fTransition">
+          <option value="">—</option>
+          <option value="硬切">硬切</option>
+          <option value="快切">快切</option>
+          <option value="闪白转场">闪白转场</option>
+          <option value="淡入淡出">淡入淡出</option>
+          <option value="渐变">渐变</option>
+          <option value="溶解">溶解</option>
+          <option value="划接">划接</option>
+          <option value="无">无</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>时长（秒）</label>
+        <input id="fDur" type="number" min="0" placeholder="5" />
+      </div>
+      <div class="field">
+        <label>状态</label>
+        <select id="fStatus">
+          <option value="todo">待生成</option>
+          <option value="doing">生成中</option>
+          <option value="ok">已定稿</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>音乐 / 音效</label>
+      <input id="fAudio" placeholder="如：轻钢琴 / 风声" />
+    </div>
+    <div class="field">
+      <label>备注</label>
+      <textarea id="fNote" placeholder="拍摄/后期说明" style="min-height:50px"></textarea>
+    </div>
+    <div class="field">
+      <label>缩略图</label>
+      <div class="thumb-pick">
+        <img id="fThumbPrev" alt="" style="display:none" />
+        <button type="button" id="btnUpImg">上传图片</button>
+        <input id="fImgUrl" placeholder="或填图片链接 URL" style="flex:1" />
+        <input type="file" id="imgFile" accept="image/*" style="display:none" />
+      </div>
+      <div class="thumb-pick" style="margin-top:10px">
+        <button type="button" id="btnAiImg">🎨 交给 AI 画分镜图</button>
+        <select id="aiStyle" title="画面风格">
+          <option value="电影感，写实">电影感·写实</option>
+          <option value="动漫插画风格">动漫插画</option>
+          <option value="三维渲染，皮克斯风">三维渲染</option>
+          <option value="水彩手绘风格">水彩手绘</option>
+          <option value="极简线条分镜草图">极简草图</option>
+        </select>
+      </div>
+      <p class="hint-sm">选好风格点「交给 AI 画」，会按本镜的画面/景别/角度/运镜生成绘图提示词，复制后交给你的 AI 绘图工具（可灵 / 即梦 / Midjourney 等），出图后回到上面「上传图片」或填链接即可。</p>
+    </div>
+    <div class="modal-actions">
+      <button class="ghost" id="btnCancel">取消</button>
+      <button class="primary" id="btnSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI 首帧分镜图生成弹窗 -->
+<div class="overlay" id="aiOverlay">
+  <div class="modal">
+    <h3>🎨 生成首帧分镜图</h3>
+    <div class="field">
+      <label>提示词（可微调）</label>
+      <textarea id="aiPrompt" style="min-height:120px"></textarea>
+    </div>
+    <div class="field">
+      <label>参考图（选 1 张用作 img2img，保持人物/场景一致性）</label>
+      <div id="refAssetGrid" class="ref-grid"></div>
+      <p class="hint-sm">同一人物/场景始终用同一张参考图，一致性最好。多人物建议每角色单独生成再合成。</p>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>风格</label>
+        <select id="aiStyle" title="画面风格">
+          <option value="电影感，写实">电影感·写实</option>
+          <option value="动漫插画风格">动漫插画</option>
+          <option value="三维渲染，皮克斯风">三维渲染</option>
+          <option value="水彩手绘风格">水彩手绘</option>
+          <option value="极简线条分镜草图">极简草图</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>比例</label>
+        <select id="aiRatio">
+          <option value="768x432">横屏 16:9</option>
+          <option value="432x768">竖屏 9:16</option>
+          <option value="640x640">方形 1:1</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" id="imgPrevWrap" style="display:none">
+      <label>生成结果</label>
+      <img id="imgPrev" alt="" style="width:100%; max-height:260px; object-fit:contain; border:1px solid var(--line); border-radius:8px" />
+      <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap">
+        <button type="button" class="primary" id="btnSetThumb">✅ 设为缩略图</button>
+        <button type="button" id="btnDownImg">⬇ 下载图片</button>
+      </div>
+    </div>
+    <p class="hint-sm" id="genHint">点「生成」通过免费在线接口出图（无需密钥，约 10-30 秒）。也可复制提示词交给可灵 / 即梦 / Midjourney 等工具出图。</p>
+    <div class="modal-actions">
+      <button class="ghost" id="btnAiClose">关闭</button>
+      <button id="btnAiCopy">📋 复制提示词</button>
+      <button class="primary" id="btnAiGen">⚡ 生成首帧图</button>
+    </div>
+  </div>
+</div>
+
+<!-- 视频生成弹窗 -->
+<div class="overlay" id="vidOverlay">
+  <div class="modal">
+    <h3>🎬 生成视频</h3>
+    <div class="field">
+      <label>视频提示词（可微调）</label>
+      <textarea id="vidPrompt" style="min-height:130px"></textarea>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>时长</label>
+        <select id="vidSecs">
+          <option value="3">3 秒</option>
+          <option value="5" selected>5 秒</option>
+          <option value="8">8 秒</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>比例</label>
+        <select id="vidRatio">
+          <option value="16:9">横屏 16:9</option>
+          <option value="9:16">竖屏 9:16</option>
+          <option value="1:1">方形 1:1</option>
+        </select>
+      </div>
+    </div>
+    <p class="hint-sm">「复制提示词」可粘贴到任意 AI 视频工具（可灵 / 即梦 / Seedance）。点「交给 Airen 生成」会生成一段请求文字，粘贴到 WorkBuddy 对话里，Airen 用内置视频模型帮你出片，再把视频文件发回设到这一镜。</p>
+    <div class="modal-actions">
+      <button class="ghost" id="btnVidClose">关闭</button>
+      <button id="btnVidCopy">📋 复制提示词</button>
+      <button class="primary" id="btnVidAiren">🤖 交给 Airen 生成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 资产库弹窗 -->
+<div class="overlay" id="assetsOverlay">
+  <div class="modal">
+    <h3>🗂 资产仓库</h3>
+    <p class="hint-sm" style="margin-top:-6px">管理人物 / 场景 / 道具参考图，生成图像时可一键带入提示词，保持一致性。</p>
+    <div class="ass-tabs">
+      <button class="ass-tab" data-cat="人物">人物</button>
+      <button class="ass-tab" data-cat="场景">场景</button>
+      <button class="ass-tab" data-cat="道具">道具</button>
+    </div>
+    <div id="assetGrid" class="asset-grid"></div>
+    <div class="field" style="margin-top:14px">
+      <label>新增到「<span id="curCat">人物</span>」库</label>
+      <div class="thumb-pick">
+        <button type="button" id="btnAssetUp">上传图片</button>
+        <input id="assetUrl" placeholder="或填图片链接 URL" style="flex:1" />
+        <input type="file" id="assetFile" accept="image/*" style="display:none" />
+      </div>
+      <input id="assetName" placeholder="名称（必填，如：男主 / 客厅 / 咖啡杯）" style="margin-top:8px" />
+      <input id="assetDesc" placeholder="描述（可选：年龄/服装/风格…）" style="margin-top:8px" />
+      <button class="primary" id="btnAssetAdd" style="margin-top:8px">＋ 添加到资产库</button>
+    </div>
+    <div class="modal-actions">
+      <button class="ghost" id="btnAssetsClose">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 提示词库抽屉 -->
+<div id="promptLib" class="prompt-panel">
+  <div class="pp-head">💬 提示词库 <button id="ppClose" title="关闭">✕</button></div>
+  <div id="ppList" class="pp-list"></div>
+  <div class="pp-add">
+    <textarea id="ppText" rows="2" placeholder="输入提示词模块，如：角色1：穿蓝外套的男人…"></textarea>
+    <button class="primary" id="ppAdd">＋ 添加</button>
+  </div>
+  <p class="hint-sm">电脑：拖拽模块到「画面描述」格即可插入；点击模块复制。手机：点模块复制后粘贴。</p>
+</div>
+
+<script>
+const LS_KEY = "storyboard_board_v1";
+const STAT = {todo:{label:"待生成",cls:"todo"},doing:{label:"生成中",cls:"doing"},ok:{label:"已定稿",cls:"ok"}};
+
+let state = { project:"", script:"", shots:[], assets:[], promptLib:[] };
+let editingId = null;       // 正在编辑的镜头 id
+let aiTargetId = null;      // AI 生成当前对应的镜头 id
+let _lastImg = "";          // 最近生成的首帧图 URL
+let pendingImg = "";        // 当前弹窗暂存的图片（base64 或 url）
+let filterStatus = "";      // 筛选：状态
+let filterJingbie = "";     // 筛选：景别
+let assetCat = "人物";      // 资产库当前分类
+let pendingAssetImg = "";   // 待入库图片
+let _refAssetIds = [];      // 当前 AI 生成弹窗选中的参考图（单选，存 id）
+
+// ---------- 持久化 ----------
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(LS_KEY)); if(s) state = Object.assign(state, s); }catch(e){}
+}
+function save(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+
+// ---------- 工具 ----------
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1600); }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function fmtDur(sec){ sec = Math.max(0, Math.round(Number(sec)||0)); const m=Math.floor(sec/60), s=sec%60; return m+":"+String(s).padStart(2,"0"); }
+function fmtTime(sec){
+  sec = Math.max(0, Number(sec)||0);
+  const m = Math.floor(sec/60), rest = sec - m*60;
+  const sStr = Number.isInteger(rest) ? String(rest).padStart(2,"0") : rest.toFixed(1).padStart(4,"0");
+  return m+":"+sStr;
+}
+function sumDur(arr){ return arr.reduce((a,s)=>a+(Math.round(Number(s.dur)||0)),0); }
+function moveStr(s){ const p=[]; if(s.angle)p.push(s.angle); if(s.move)p.push(s.move); if(s.jingbie)p.push(s.jingbie); return p.join(" · "); }
+function opts(sel, list){
+  const eo = !sel ? '<option value="" selected>—</option>' : "";
+  return eo + list.map(v=>`<option value="${v}" ${v===sel?"selected":""}>${v}</option>`).join("");
+}
+const CAMERA_GROUPS = [
+  ["电影机", ["ARRI ALEXA Mini","ARRI ALEXA LF","RED Komodo","RED V-Raptor","Sony VENICE","Blackmagic URSA Mini Pro","Canon C70"]],
+  ["微单/无反（适合电影）", ["Sony FX3","Sony FX6","Sony A7S III","Panasonic Lumix S5 II","Panasonic GH6","Canon R5 C","Canon R6 II","Fujifilm X-H2S","Nikon Z8"]],
+  ["手机", ["iPhone 15 Pro","iPhone 14 Pro","Samsung Galaxy S24 Ultra","华为 Mate 60 Pro","小米 14 Ultra"]]
+];
+function optsGroup(sel, groups){
+  const eo = !sel ? '<option value="" selected>—</option>' : "";
+  const body = groups.map(g=>`<optgroup label="${esc(g[0])}">${g[1].map(v=>`<option value="${v}" ${v===sel?"selected":""}>${v}</option>`).join("")}</optgroup>`).join("");
+  return eo + body;
+}
+function autoResize(el){ el.style.height="auto"; el.style.height=(el.scrollHeight+2)+"px"; }
+function fmtT(s){
+  const a = s.startTime, b = s.endTime;
+  const hasA = a!==undefined && a!=="";
+  const hasB = b!==undefined && b!=="";
+  if(!hasA && !hasB) return "";
+  if(hasA && !hasB) return String(a);
+  if(!hasA && hasB) return String(b);
+  if(a===b) return String(a);
+  return String(a)+"-"+String(b);
+}
+function parseTimeRange(v, s){
+  const t = String(v||"").trim().replace(/s$/i,"");
+  if(!t){ s.startTime=""; s.endTime=""; return; }
+  const parts = t.split(/\s*[-–—~]\s*/);
+  const a = parseFloat(parts[0]);
+  if(parts.length===1){
+    s.startTime = isNaN(a)?"":a;
+    s.endTime = isNaN(a)?"":a;
+  } else {
+    const b = parseFloat(parts[1]);
+    s.startTime = isNaN(a)?"":a;
+    s.endTime = isNaN(b)?"":b;
+  }
+}
+let _saveTimer=null;
+function debounceSave(){ clearTimeout(_saveTimer); _saveTimer=setTimeout(save,250); }
+// 单镜提示词（供视频生成软件投喂）
+function buildShotPrompt(s, idx){
+  const parts = [];
+  if(s.jingbie) parts.push(s.jingbie+"景别");
+  if(s.position) parts.push(s.position);
+  if(s.move && s.move!=="固定") parts.push(s.move+"镜头");
+  if(s.camera) parts.push(s.camera);
+  if(s.focal) parts.push(s.focal);
+  if(s.desc) parts.push(s.desc);
+  if(s.extra) parts.push(s.extra);
+  let body = parts.join("，");
+  if(body) body += "。";
+  const t = fmtT(s);
+  const head = "【镜头"+(idx||"?")+"】"+(t?("时间 "+t+"s，"):"");
+  return head + body;
+}
+// 全片提示词整理（每镜一段，可整体复制）
+function buildFullPrompt(){
+  if(state.shots.length===0) return "（分镜表还是空的，先新增分镜吧）";
+  return state.shots.map((s,i)=>{
+    const head = "【镜头"+(i+1)+"】"+(fmtT(s) ? "（"+fmtT(s)+"s）" : "");
+    const lines = [];
+    if(s.desc) lines.push("画面："+s.desc);
+    if(s.jingbie) lines.push("景别："+s.jingbie);
+    if(s.position) lines.push("机位："+s.position);
+    if(s.move && s.move!=="固定") lines.push("运镜："+s.move);
+    if(s.camera) lines.push("相机："+s.camera+(s.focal?"，"+s.focal:""));
+    else if(s.focal) lines.push("焦段："+s.focal);
+    if(s.extra) lines.push("补充："+s.extra);
+    return head + (lines.length ? "\n"+lines.join("\n") : "");
+  }).join("\n\n");
+}
+
+// ---------- 渲染 ----------
+function render(){
+  const board = document.getElementById("board");
+  const empty = document.getElementById("emptyHint");
+  board.innerHTML = "";
+  const list = state.shots.filter(s=>
+    (!filterStatus || s.status===filterStatus) &&
+    (!filterJingbie || s.jingbie===filterJingbie)
+  );
+  // 空状态：无镜头 vs 筛选无匹配
+  if(state.shots.length === 0){ empty.style.display="block"; empty.textContent="还没有分镜。点「＋ 新增分镜」开始。"; }
+  else if(list.length === 0){ empty.style.display="block"; empty.textContent="当前筛选条件下没有分镜。"; }
+  else { empty.style.display="none"; }
+  document.getElementById("filterInfo").textContent = `共 ${list.length} / ${state.shots.length} 个 · 片长 ${fmtDur(sumDur(list))}`;
+  list.forEach(s=>{
+    const i = state.shots.indexOf(s);
+    const st = STAT[s.status]||STAT.todo;
+    const tr = document.createElement("tr");
+    tr.dataset.id = s.id;
+    tr.innerHTML = `
+      <td class="c-num">
+        <span class="st-bar bar-${s.status||"todo"}" title="点击切换状态（当前：${st.label}）"></span>
+        ${i+1}
+      </td>
+      <td class="c-time"><input class="ed t2" data-f="time" value="${esc(fmtT(s))}" placeholder="0-5" title="格式：开始-结束（秒）" /></td>
+      <td class="c-camera"><select class="ed" data-f="camera" title="相机型号">${optsGroup(s.camera, CAMERA_GROUPS)}</select></td>
+      <td class="c-focal"><select class="ed" data-f="focal">${opts(s.focal,["16mm","24mm","28mm","35mm","50mm","85mm","100mm","135mm","变焦"])}</select></td>
+      <td class="c-jingbie"><select class="ed" data-f="jingbie">${opts(s.jingbie,["远景","全景","中景","近景","特写"])}</select></td>
+      <td class="c-pos"><select class="ed" data-f="position">${opts(s.position,["正面机位","侧面机位","过肩机位","背面机位","低机位","高机位","顶机位"])}</select></td>
+      <td class="c-move"><select class="ed" data-f="move">${opts(s.move,["固定","推","拉","左摇","右摇","上摇","下摇","左平移","右平移","前移","后退","升","降","跟","环绕","变焦"])}</select></td>
+      <td class="c-desc"><textarea class="ed" rows="1" data-f="desc" placeholder="—">${esc(s.desc||"")}</textarea></td>
+      <td class="c-extra"><textarea class="ed" rows="1" data-f="extra" placeholder="—">${esc(s.extra||"")}</textarea></td>
+      <td class="c-ops">
+        <button data-prompt="${s.id}" title="复制本镜提示词">📋</button>
+        <button data-mv="up" data-id="${s.id}" title="上移">↑</button>
+        <button data-mv="down" data-id="${s.id}" title="下移">↓</button>
+        <button class="del" data-del="${s.id}" title="删除">✕</button>
+        <span class="dh" draggable="true" data-dh="${s.id}" title="拖动排序">⠿</span>
+      </td>
+    `;
+    board.appendChild(tr);
+  });
+  board.querySelectorAll("textarea.ed").forEach(autoResize);
+}
+
+function reorder(fromId, toId){
+  if(fromId===toId) return;
+  const arr = state.shots;
+  const fi = arr.findIndex(x=>x.id===fromId);
+  const ti = arr.findIndex(x=>x.id===toId);
+  if(fi<0||ti<0) return;
+  const [m] = arr.splice(fi,1);
+  arr.splice(ti,0,m);
+  save(); render();
+}
+function moveShot(id, dir){
+  const arr = state.shots;
+  const i = arr.findIndex(x=>x.id===id);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=arr.length) return;
+  [arr[i], arr[j]] = [arr[j], arr[i]];
+  save(); render();
+}
+
+// ---------- 弹窗 ----------
+function openModal(id){
+  editingId = id;
+  const s = id ? state.shots.find(x=>x.id===id) : null;
+  document.getElementById("modalTitle").textContent = id ? "编辑分镜" : "新增分镜";
+  document.getElementById("fTitle").value = s?s.title:"";
+  document.getElementById("fStart").value = (s&&s.startTime!==undefined) ? s.startTime : "";
+  document.getElementById("fEnd").value = (s&&s.endTime!==undefined) ? s.endTime : "";
+  document.getElementById("fDesc").value = s?s.desc:"";
+  document.getElementById("fChar").value = s?s.char:"";
+  document.getElementById("fLine").value = s?s.line:"";
+  document.getElementById("fJingbie").value = s?s.jingbie:"";
+  document.getElementById("fAngle").value = s?s.angle:"";
+  document.getElementById("fMove").value = s?s.move:"";
+  document.getElementById("fTransition").value = s?s.transition:"";
+  document.getElementById("fAudio").value = s?s.audio:"";
+  document.getElementById("fDur").value = s?s.dur:"";
+  document.getElementById("fStatus").value = s?s.status:"todo";
+  document.getElementById("fNote").value = s?s.note:"";
+  const curImg = s?s.img:"";
+  document.getElementById("fImgUrl").value = (curImg && !curImg.startsWith("data:")) ? curImg : "";
+  pendingImg = s?s.img:"";
+  const prev = document.getElementById("fThumbPrev");
+  if(pendingImg){ prev.src=pendingImg; prev.style.display="block"; } else prev.style.display="none";
+  document.getElementById("overlay").classList.add("show");
+  document.body.classList.add("modal-open");
+}
+function closeModal(){ document.getElementById("overlay").classList.remove("show"); document.body.classList.remove("modal-open"); editingId=null; }
+
+function saveModal(){
+  const data = {
+    title: document.getElementById("fTitle").value.trim(),
+    startTime: document.getElementById("fStart").value,
+    endTime: document.getElementById("fEnd").value,
+    desc: document.getElementById("fDesc").value.trim(),
+    char: document.getElementById("fChar").value.trim(),
+    line: document.getElementById("fLine").value.trim(),
+    jingbie: document.getElementById("fJingbie").value,
+    angle: document.getElementById("fAngle").value,
+    move: document.getElementById("fMove").value,
+    transition: document.getElementById("fTransition").value,
+    audio: document.getElementById("fAudio").value.trim(),
+    dur: document.getElementById("fDur").value.trim(),
+    status: document.getElementById("fStatus").value,
+    note: document.getElementById("fNote").value.trim(),
+    img: document.getElementById("fImgUrl").value.trim() || pendingImg || ""
+  };
+  if(editingId){
+    const s = state.shots.find(x=>x.id===editingId);
+    Object.assign(s, data);
+  } else {
+    state.shots.push(Object.assign({id:uid()}, data));
+  }
+  save(); render(); closeModal();
+  toast(editingId?"已更新":"已新增分镜");
+}
+
+// ---------- 增删 ----------
+function nextTimeCursor(){
+  if(state.shots.length===0) return 0;
+  const last = state.shots[state.shots.length-1];
+  return Number(last.endTime) || ((Number(last.startTime)||0) + (Number(last.dur)||5));
+}
+function addShot(){
+  const t = nextTimeCursor();
+  const shot = {id:uid(), title:"", startTime:t, endTime:t+5, desc:"", line:"", camera:"", focal:"", jingbie:"", position:"", angle:"", move:"", transition:"", audio:"", extra:"", dur:"5", status:"todo", note:"", img:"", refAssets:[]};
+  state.shots.push(shot);
+  // 若当前筛选把新行藏了（新行是待生成+空景别），自动清除筛选保证可见
+  const shown = state.shots.some(s=>s.id===shot.id && (!filterStatus || s.status===filterStatus) && (!filterJingbie || s.jingbie===filterJingbie));
+  if(!shown){
+    filterStatus=""; filterJingbie="";
+    document.getElementById("fFilterStatus").value="";
+    document.getElementById("fFilterJingbie").value="";
+    toast("已清除筛选，方便看到新镜头");
+  }
+  save(); render();
+  const trs = document.querySelectorAll("#board tr");
+  const last = trs[trs.length-1];
+  if(last){
+    const first = last.querySelector("textarea.ed, input.ed");
+    if(first){ first.focus(); }
+    last.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+}
+function deleteShot(id){
+  state.shots = state.shots.filter(x=>x.id!==id);
+  save(); render();
+  toast("已删除镜头");
+}
+
+// ---------- 导入导出 ----------
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (state.project||"storyboard")+"_分镜台.json";
+  a.click();
+  toast("已导出 JSON");
+}
+function exportCSV(){
+  const head = ["镜号","开始时间","结束时间","标题","画面描述","人物","台词/旁白","景别","角度","运镜方式","转场","音乐/音效","时长(秒)","状态","备注","缩略图"];
+  const rows = state.shots.map((s,i)=>[
+    i+1,
+    s.startTime!==undefined&&s.startTime!==""?fmtTime(s.startTime):"",
+    s.endTime!==undefined&&s.endTime!==""?fmtTime(s.endTime):"",
+    s.title, s.desc, s.char, s.line,
+    s.jingbie, s.angle, moveStr(s), s.transition,
+    s.audio, s.dur,
+    (STAT[s.status]||STAT.todo).label, s.note, s.img
+  ]);
+  const cell = c=>{ const v=(c==null?"":String(c)); return /[",\n\r]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  const csv = [head, ...rows].map(r=>r.map(cell).join(",")).join("\r\n");
+  const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (state.project||"storyboard")+"_分镜台.csv";
+  a.click();
+  toast("已导出 CSV（可用 Excel 打开）");
+}
+function importJSON(file){
+  const r = new FileReader();
+  r.onload = ()=>{ try{ const d=JSON.parse(r.result); if(d&&Array.isArray(d.shots)){ state=d; save(); render(); toast("导入成功"); } else toast("文件格式不对"); }catch(e){ toast("解析失败"); } };
+  r.readAsText(file);
+}
+
+// ---------- 事件 ----------
+document.getElementById("btnAdd").onclick = addShot;
+
+// ---------- 表格行内编辑（事件委托） ----------
+const board = document.getElementById("board");
+board.addEventListener("input", e=>{
+  const el = e.target;
+  if(!el.classList || !el.classList.contains("ed")) return;
+  const tr = el.closest("tr");
+  const s = tr ? state.shots.find(x=>x.id===tr.dataset.id) : null;
+  if(!s) return;
+  if(el.dataset.f==="time"){ parseTimeRange(el.value, s); }
+  else { s[el.dataset.f] = el.value; }
+  debounceSave();
+  if(el.tagName==="TEXTAREA") autoResize(el);
+});
+board.addEventListener("click", e=>{
+  const bar = e.target.closest(".st-bar");
+  if(bar){
+    const s = state.shots.find(x=>x.id===bar.closest("tr").dataset.id);
+    if(!s) return;
+    const order=["todo","doing","ok"];
+    s.status = order[(order.indexOf(s.status)+1)%3];
+    save(); render();
+    toast("状态："+(STAT[s.status]||STAT.todo).label);
+    return;
+  }
+  const del = e.target.closest("[data-del]");
+  if(del){
+    if(del.dataset.confirm==="1"){
+      deleteShot(del.dataset.del);
+    } else {
+      del.dataset.confirm = "1";
+      del.textContent = "确认?";
+      del.classList.add("confirming");
+      setTimeout(()=>{ if(del && del.isConnected && del.dataset.confirm==="1"){ delete del.dataset.confirm; del.textContent="✕"; del.classList.remove("confirming"); } }, 2500);
+    }
+    return;
+  }
+  const mv = e.target.closest("[data-mv]");
+  if(mv){ moveShot(mv.dataset.id, mv.dataset.mv==="up"?-1:1); return; }
+  const pm = e.target.closest("[data-prompt]");
+  if(pm){
+    const s = state.shots.find(x=>x.id===pm.dataset.prompt);
+    if(!s) return;
+    const i = state.shots.indexOf(s)+1;
+    copyText(buildShotPrompt(s,i));
+    toast("已复制镜头 #"+i+" 的提示词");
+    return;
+  }
+  const ed = e.target.closest("[data-edit]");
+  if(ed){ openModal(ed.dataset.edit); }
+  const gen = e.target.closest("[data-open]");
+  if(gen){ if(gen.dataset.open==="img") openAiGen(gen.dataset.id); else openVidGen(gen.dataset.id); return; }
+  const prev = e.target.closest("[data-preview]");
+  if(prev){ window.open(prev.dataset.preview, "_blank"); return; }
+});
+// 全局委托：资产库 / AI 弹窗 / 提示词库的点击
+document.addEventListener("click", e=>{
+  const tab = e.target.closest(".ass-tab");
+  if(tab){ assetCat = tab.dataset.cat; renderAssets(); return; }
+  const assetDel = e.target.closest("[data-asset-del]");
+  if(assetDel){ deleteAsset(assetDel.dataset.assetDel); return; }
+  const assetPick = e.target.closest(".asset-thumb");
+  if(assetPick){ toggleRefAsset(assetPick.dataset.aid); return; }
+  const ppDel = e.target.closest("[data-pp-del]");
+  if(ppDel){ deletePrompt(ppDel.dataset.ppDel); return; }
+  const ppItem = e.target.closest(".pp-item");
+  if(ppItem && !e.target.closest("[data-pp-del]")){ copyText(ppItem.dataset.text); toast("已复制，可粘贴到画面描述"); return; }
+});
+// 提示词库
+const PRESET_PROMPTS = {
+  "情绪·喜": [
+    "开怀大笑，眼角笑出细纹",
+    "嘴角忍不住上扬，偷偷抿嘴笑",
+    "眼里闪着光，开心得蹦跳起来",
+    "收到惊喜，眼睛瞬间发亮",
+    "满足地眯起眼，轻哼小调"
+  ],
+  "情绪·怒": [
+    "怒目圆睁，紧咬后槽牙",
+    "拍案而起，桌面震动",
+    "气得浑身发抖，攥紧的拳头指节发白",
+    "一脸阴沉，压着怒火低声说话",
+    "猛地摔门而去，头也不回"
+  ],
+  "情绪·哀": [
+    "眼泪无声滑落，眼神涣散",
+    "哭得不能自已，抽噎到说不出话",
+    "独自蹲在角落，肩膀一抽一抽",
+    "望着照片发呆，眼里泛着泪光",
+    "垂头丧气，浑身疲惫无力"
+  ],
+  "情绪·乐": [
+    "放松地靠进沙发，惬意舒展",
+    "兴奋得手舞足蹈",
+    "和朋友一起开怀大笑",
+    "哼着歌，脚步轻快",
+    "心情大好，走路带风"
+  ],
+  "情绪·其他": [
+    "惊讶得张大了嘴，眼睛瞪圆",
+    "恐惧地后退两步，声音发颤",
+    "紧张地咽了咽口水，手心冒汗",
+    "狐疑地眯起眼，上下打量对方",
+    "被感动得眼眶湿润",
+    "害羞地低下头，脸颊微红",
+    "愧疚地垂着眼，不敢对视",
+    "羡慕地远远望着，眼神暗淡",
+    "期待地踮起脚张望",
+    "一脸不屑，翻了个白眼",
+    "平静地看着远处，眼神深邃",
+    "一脸无奈，耸了耸肩"
+  ],
+  "动作": [
+    "原地转身，衣角随风扬起",
+    "伸了个懒腰，舒展筋骨",
+    "揉了揉太阳穴，眉头微皱",
+    "双手插兜，慢悠悠地走过",
+    "蹲下系鞋带，站起来拍了拍手",
+    "端起咖啡杯，轻轻吹了吹热气",
+    "拿起手机，皱眉看了看消息",
+    "快步走向门口，抬手拦下出租车",
+    "站在窗边，指尖划过玻璃",
+    "翻开书页，专注地阅读",
+    "戴上耳机，闭上眼沉浸音乐",
+    "打了个响指，眼神笃定",
+    "用手背擦去额头的汗",
+    "从口袋里掏出钥匙，打开门",
+    "抱起手臂，侧头思考",
+    "俯身拾起地上的纸张",
+    "转身挥手告别，脸上带着笑",
+    "背对着镜头，慢步走远"
+  ],
+  "场景·雨天": [
+    "雨中伫立，雨水顺着发梢滴落",
+    "独自撑伞站在雨里，望着空荡的街道",
+    "雨滴打湿衣角，加快脚步躲进檐下",
+    "隔着雨幕与人对视，神情复杂",
+    "雨夜霓虹灯在积水里晃动，倒映孤独身影",
+    "蹲在屋檐下，看雨水汇成细流"
+  ],
+  "动作·打斗": [
+    "挥拳直击，带起风声",
+    "侧身躲开攻击，反手一肘",
+    "快速踢腿，横扫对方下盘",
+    "翻滚闪避，顺势起身反击",
+    "贴身缠斗，两人同时锁住对方",
+    "被一拳击退，踉跄稳住身形",
+    "一拳砸在墙上，指节渗血",
+    "对峙僵持，双方呼吸急促"
+  ],
+  "场景·恋爱": [
+    "两人在雨中同撑一把伞，肩并肩慢慢走",
+    "偷偷看对方，被发现后慌忙移开视线",
+    "指尖轻轻触碰，又迅速收回",
+    "拥抱时把头埋进对方肩膀",
+    "拉着手奔跑穿过人群",
+    "目送对方离开，眼中有不舍",
+    "收到花束，惊喜又害羞",
+    "靠在一起看夕阳，安静满足"
+  ],
+  "情绪·更多": [
+    "嫉妒地咬着下唇，眼神发暗",
+    "愧疚地低着头，声音越来越小",
+    "释然一笑，松开紧握的拳头",
+    "绝望地瘫坐在地，目光失焦",
+    "欣喜若狂，原地转圈",
+    "傲慢地抬起下巴，斜眼睨视",
+    "尴尬地挠挠头，干笑两声",
+    "麻木地目视前方，毫无波澜",
+    "温暖地笑了笑，眼里有光",
+    "焦虑地来回踱步，频繁看表",
+    "困惑地歪着头，皱起眉头",
+    "依依不舍地回头，脚步放慢"
+  ]
+};
+function togglePromptLib(){ document.getElementById("promptLib").classList.toggle("open"); }
+function renderPromptLib(){
+  const list = document.getElementById("ppList");
+  if(!list) return;
+  const presets = Object.entries(PRESET_PROMPTS).map(([cat, arr])=>
+    '<div class="pp-sep">'+cat+'</div>' + arr.map(t=>`
+      <div class="pp-item preset" draggable="true" data-text="${esc(t)}" title="内置 · 拖到画面描述格插入 / 点击复制">
+        ${esc(t)}<span class="pp-badge">内置</span>
+      </div>`).join("")
+  ).join("");
+  const custom = state.promptLib.map(p=>`
+    <div class="pp-item" draggable="true" data-text="${esc(p.text)}" title="拖到画面描述格插入 / 点击复制">
+      ${esc(p.text)}
+      <button class="pp-del" data-pp-del="${p.id}" title="删除">✕</button>
+    </div>`).join("");
+  list.innerHTML = presets + (state.promptLib.length ? '<div class="pp-sep">我的模块</div>' + custom : '');
+}
+function addPrompt(){
+  const t = document.getElementById("ppText").value.trim();
+  if(!t){ toast("先输入内容"); return; }
+  state.promptLib.push({id:uid(), text:t});
+  save(); renderPromptLib();
+  document.getElementById("ppText").value="";
+  toast("已添加");
+}
+function deletePrompt(id){
+  state.promptLib = state.promptLib.filter(p=>p.id!==id);
+  save(); renderPromptLib();
+  toast("已删除");
+}
+document.getElementById("btnPromptLib").onclick = togglePromptLib;
+document.getElementById("btnFullPrompt").onclick = ()=>{
+  const t = buildFullPrompt();
+  copyText(t);
+  toast(state.shots.length? "已复制全部镜头的提示词整理" : "分镜表是空的");
+};
+document.getElementById("ppClose").onclick = togglePromptLib;
+document.getElementById("ppAdd").onclick = addPrompt;
+// 模块拖拽：dragstart 时把文本放 dataTransfer 特殊类型
+document.addEventListener("dragstart", e=>{
+  const item = e.target.closest(".pp-item");
+  if(item){ e.dataTransfer.setData("application/x-prompt", item.dataset.text); item.classList.add("dragging"); }
+});
+document.addEventListener("dragend", e=>{ const it = e.target.closest(".pp-item"); if(it) it.classList.remove("dragging"); });
+// 拖动排序：从行尾 ⠿ 手柄发起，输入框内不触发
+board.addEventListener("dragstart", e=>{
+  const dh = e.target.closest(".dh");
+  if(dh){ e.dataTransfer.setData("text/plain", dh.dataset.dh); dh.classList.add("dragging"); }
+});
+board.addEventListener("dragend", e=>{ e.target.classList.remove("dragging"); });
+board.addEventListener("dragover", e=>{
+  const tr = e.target.closest("tr");
+  if(!tr) return;
+  const isPrompt = e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("application/x-prompt");
+  if(isPrompt || !e.target.closest(".ed")){ e.preventDefault(); tr.classList.add("dragover"); }
+});
+board.addEventListener("dragleave", e=>{
+  const tr = e.target.closest("tr");
+  if(tr) tr.classList.remove("dragover");
+});
+board.addEventListener("drop", e=>{
+  const tr = e.target.closest("tr");
+  if(!tr) return;
+  e.preventDefault(); tr.classList.remove("dragover");
+  const prompt = e.dataTransfer.getData("application/x-prompt");
+  if(prompt){
+    const ta = e.target.closest("textarea.ed");
+    if(ta){
+      const st = ta.selectionStart, en = ta.selectionEnd;
+      const val = ta.value;
+      ta.value = val.slice(0,st) + prompt + val.slice(en);
+      ta.selectionStart = ta.selectionEnd = st + prompt.length;
+      ta.focus();
+      ta.dispatchEvent(new Event("input",{bubbles:true}));
+      toast("已插入提示词");
+    }
+    return;
+  }
+  const from = e.dataTransfer.getData("text/plain");
+  if(from) reorder(from, tr.dataset.id);
+});
+
+document.getElementById("btnSave").onclick = saveModal;
+document.getElementById("btnCancel").onclick = closeModal;
+document.getElementById("overlay").onclick = e=>{ if(e.target.id==="overlay") closeModal(); };
+let clearConfirm = false;
+document.getElementById("btnClear").onclick = ()=>{
+  const btn = document.getElementById("btnClear");
+  if(clearConfirm){
+    clearConfirm=false;
+    btn.textContent="🗑 清空"; btn.classList.remove("confirming");
+    state.shots=[]; state.assets=[]; save(); render(); toast("已清空");
+  } else {
+    clearConfirm=true;
+    btn.textContent="确认清空?";
+    btn.classList.add("confirming");
+    setTimeout(()=>{ clearConfirm=false; const b=document.getElementById("btnClear"); if(b){ b.textContent="🗑 清空"; b.classList.remove("confirming"); } }, 2500);
+  }
+};
+document.getElementById("fFilterStatus").onchange = e=>{ filterStatus=e.target.value; render(); };
+document.getElementById("fFilterJingbie").onchange = e=>{ filterJingbie=e.target.value; render(); };
+
+// 图片上传
+document.getElementById("btnUpImg").onclick = ()=> document.getElementById("imgFile").click();
+document.getElementById("imgFile").onchange = e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{ pendingImg=r.result; const p=document.getElementById("fThumbPrev"); p.src=pendingImg; p.style.display="block"; document.getElementById("fImgUrl").value=""; };
+  r.readAsDataURL(f);
+};
+document.getElementById("fImgUrl").oninput = e=>{ if(e.target.value.trim()){ pendingImg=e.target.value.trim(); const p=document.getElementById("fThumbPrev"); p.src=pendingImg; p.style.display="block"; } };
+
+// ---------- AI 首帧图 / 视频生成 ----------
+const RATIO_LABEL = {"768x432":"横屏 16:9","432x768":"竖屏 9:16","640x640":"方形 1:1"};
+function buildPrompt(s){
+  const style = document.getElementById("aiStyle").value;
+  const ratio = RATIO_LABEL[document.getElementById("aiRatio").value] || "";
+  let p = "";
+  if(s.jingbie) p += s.jingbie+"景别，";
+  if(s.angle) p += s.angle+"视角，";
+  if(s.move && s.move!=="固定") p += s.move+"镜头，";
+  if(s.char) p += "人物："+s.char+"，";
+  p += (s.desc || "（未填写画面描述）");
+  p += "。"+style+"，分镜插画风格，构图干净，主体清晰，电影级打光";
+  if(ratio) p += "，画面比例 "+ratio;
+  p += "。";
+  return p;
+}
+function buildVideoPrompt(s){
+  const style = document.getElementById("aiStyle").value;
+  const secs = document.getElementById("vidSecs").value;
+  const ratio = document.getElementById("vidRatio").value;
+  let p = "";
+  if(s.jingbie) p += s.jingbie+"景别，";
+  if(s.angle) p += s.angle+"角度，";
+  if(s.move && s.move!=="固定") p += s.move+"运镜，";
+  if(s.char) p += "人物："+s.char+"，";
+  if(s.transition) p += "转场 "+s.transition+"，";
+  if(s.audio) p += "音效/音乐："+s.audio+"，";
+  p += (s.desc || "（未填写画面描述）");
+  const hasT = (s.startTime!==undefined && s.startTime!=="") || (s.endTime!==undefined && s.endTime!=="");
+  p += "。"+style+"，电影级画面，光影细腻，动作自然连贯，画质高，";
+  if(hasT) p += "时间码 "+(fmtTime(s.startTime||0))+" - "+(fmtTime(s.endTime||0))+"，";
+  p += "时长约 "+secs+" 秒，比例 "+ratio+"。";
+  return p;
+}
+function copyText(t){
+  const done = ()=> toast("已复制");
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done).catch(()=>{ fallbackCopy(t); done(); });
+  } else { fallbackCopy(t); done(); }
+}
+function fallbackCopy(t){
+  const ta = document.createElement("textarea");
+  ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+}
+function openAiGen(id){
+  aiTargetId = id;
+  const s = state.shots.find(x=>x.id===id) || {};
+  document.getElementById("aiPrompt").value = buildPrompt(s);
+  _refAssetIds = Array.isArray(s.refAssets) ? [...s.refAssets] : [];
+  renderRefAssets();
+  document.getElementById("imgPrevWrap").style.display="none";
+  document.getElementById("genHint").style.display="block";
+  document.getElementById("genHint").textContent = state.assets.length===0
+    ? "资产库暂无图片，先点「资产库」上传几张人物/场景/道具参考图，再选中生成效果更好。"
+    : "点「生成」通过免费在线接口出图（无需密钥，约 10-30 秒）。可选中资产库参考图保持一致性。";
+  document.getElementById("aiOverlay").classList.add("show");
+}
+function openVidGen(id){
+  aiTargetId = id;
+  const s = state.shots.find(x=>x.id===id) || {};
+  document.getElementById("vidPrompt").value = buildVideoPrompt(s);
+  document.getElementById("vidOverlay").classList.add("show");
+}
+function genFirstFrame(){
+  const prompt = document.getElementById("aiPrompt").value.trim();
+  if(!prompt){ toast("先填提示词"); return; }
+  const [w,h] = document.getElementById("aiRatio").value.split("x");
+  const seed = Math.floor(Math.random()*999999);
+  const ref = state.assets.find(a=>_refAssetIds.includes(a.id));
+  let url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=turbo`;
+  if(ref){ url += `&image=${encodeURIComponent(ref.img)}`; }
+  document.getElementById("genHint").style.display="block";
+  document.getElementById("genHint").textContent = ref
+    ? `⏳ 正在用「${ref.name}（${ref.cat}）」作为参考图生成（约 20-60 秒）…`
+    : "⏳ 正在生成，约 10-30 秒，请稍候…";
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = ()=>{
+    _lastImg = url;
+    document.getElementById("imgPrev").src = url;
+    document.getElementById("imgPrevWrap").style.display="block";
+    document.getElementById("genHint").textContent = ref
+      ? `✅ 用「${ref.name}」作为参考图已生成。可「设为缩略图」或「下载图片」。`
+      : "✅ 生成完成。可「设为缩略图」或「下载图片」。";
+    toast("首帧图已生成");
+  };
+  img.onerror = ()=>{
+    document.getElementById("genHint").textContent = "⚠️ 生成失败，稍后再试；或复制提示词到可灵 / 即梦 / Midjourney 生成。";
+    toast("生成失败");
+  };
+  img.src = url;
+}
+function setThumb(){
+  if(!_lastImg){ toast("先生成图片"); return; }
+  const s = state.shots.find(x=>x.id===aiTargetId);
+  if(!s){ toast("请先保存镜头再设为缩略图"); return; }
+  s.img = _lastImg; save(); render();
+  toast("已设为镜头 #"+(state.shots.indexOf(s)+1)+" 的缩略图");
+}
+function downloadImg(){
+  if(!_lastImg) return;
+  fetch(_lastImg).then(r=>r.blob()).then(b=>{
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(b);
+    a.download = "shot-"+(aiTargetId||"gen")+".jpg";
+    a.click();
+  }).catch(()=>{ window.open(_lastImg,"_blank"); });
+}
+function requestAiren(){
+  const s = state.shots.find(x=>x.id===aiTargetId);
+  const num = s ? state.shots.indexOf(s)+1 : "?";
+  const prompt = document.getElementById("vidPrompt").value;
+  const secs = document.getElementById("vidSecs").value;
+  const ratio = document.getElementById("vidRatio").value;
+  const text = `【生成视频】分镜台镜头 #${num}${s&&s.title?("（"+s.title+"）"):""}\n提示词：${prompt}\n时长：${secs}秒，比例：${ratio}\n请用内置视频模型生成这一镜的视频。`;
+  copyText(text);
+  toast("已复制请求文字，粘贴到 WorkBuddy 对话发给 Airen 即可");
+}
+// ---------- 资产库 ----------
+function openAssets(){
+  document.getElementById("curCat").textContent = assetCat;
+  document.getElementById("assetUrl").value=""; document.getElementById("assetName").value=""; document.getElementById("assetDesc").value=""; pendingAssetImg="";
+  renderAssets();
+  document.getElementById("assetsOverlay").classList.add("show");
+}
+function closeAssets(){ document.getElementById("assetsOverlay").classList.remove("show"); }
+function renderAssets(){
+  document.querySelectorAll(".ass-tab").forEach(t=>t.classList.toggle("active", t.dataset.cat===assetCat));
+  const cur = document.getElementById("curCat");
+  if(cur) cur.textContent = assetCat;
+  const grid = document.getElementById("assetGrid");
+  const list = state.assets.filter(a=>a.cat===assetCat);
+  grid.innerHTML = list.length ? list.map(a=>`
+    <div class="asset-card">
+      <div class="asset-img"><img src="${esc(a.img)}"></div>
+      <div class="asset-name">${esc(a.name)}</div>
+      ${a.desc?`<div class="asset-desc">${esc(a.desc)}</div>`:""}
+      <button class="asset-del" data-asset-del="${a.id}" title="删除">✕</button>
+    </div>`).join("") : '<div class="empty" style="padding:24px; grid-column:1/-1">暂无'+assetCat+'资产。在下方添加。</div>';
+}
+function addAsset(){
+  const name = document.getElementById("assetName").value.trim();
+  if(!name){ toast("请填名称"); return; }
+  if(!pendingAssetImg){ toast("请上传图片或填 URL"); return; }
+  const desc = document.getElementById("assetDesc").value.trim();
+  state.assets.push({id:uid(), cat:assetCat, name, img:pendingAssetImg, desc});
+  save(); renderAssets();
+  document.getElementById("assetName").value=""; document.getElementById("assetDesc").value="";
+  pendingAssetImg=""; document.getElementById("assetFile").value=""; document.getElementById("assetUrl").value="";
+  renderRefAssets();
+  toast("已添加到"+assetCat+"库");
+}
+function deleteAsset(id){
+  const a = state.assets.find(x=>x.id===id);
+  if(!a) return;
+  if(!confirm("删除资产「"+a.name+"」？")) return;
+  state.assets = state.assets.filter(x=>x.id!==id);
+  _refAssetIds = _refAssetIds.filter(x=>x!==id);
+  save(); renderAssets(); renderRefAssets();
+  // 同步当前镜头
+  if(aiTargetId){
+    const s = state.shots.find(x=>x.id===aiTargetId);
+    if(s){ s.refAssets = [..._refAssetIds]; save(); }
+  }
+}
+function renderRefAssets(){
+  const grid = document.getElementById("refAssetGrid");
+  if(!grid) return;
+  if(state.assets.length===0){
+    grid.innerHTML = '<div class="hint-sm" style="grid-column:1/-1; padding:14px">资产库为空。先点工具栏「🗂 资产库」添加几张参考图（人物/场景/道具）。</div>';
+    return;
+  }
+  grid.innerHTML = state.assets.map(a=>{
+    const sel = _refAssetIds.includes(a.id);
+    return `<div class="asset-thumb ${sel?"selected":""}" data-aid="${a.id}" title="${esc(a.name)}（${esc(a.cat)}）">
+      <img src="${esc(a.img)}">
+      <span class="asset-cat-tag">${esc(a.cat)}</span>
+      <span class="asset-name-tag">${esc(a.name)}</span>
+    </div>`;
+  }).join("");
+}
+function toggleRefAsset(id){
+  const i = _refAssetIds.indexOf(id);
+  if(i>=0) _refAssetIds.splice(i,1); else _refAssetIds=[id]; // 单选
+  renderRefAssets();
+  if(aiTargetId){
+    const s = state.shots.find(x=>x.id===aiTargetId);
+    if(s){ s.refAssets = [..._refAssetIds]; save(); }
+  }
+}
+document.getElementById("btnAiGen").onclick = genFirstFrame;
+document.getElementById("btnAiCopy").onclick = ()=> copyText(document.getElementById("aiPrompt").value);
+document.getElementById("btnSetThumb").onclick = setThumb;
+document.getElementById("btnDownImg").onclick = downloadImg;
+document.getElementById("btnAiClose").onclick = ()=> document.getElementById("aiOverlay").classList.remove("show");
+document.getElementById("aiOverlay").onclick = e=>{ if(e.target.id==="aiOverlay") document.getElementById("aiOverlay").classList.remove("show"); };
+document.getElementById("btnVidCopy").onclick = ()=> copyText(document.getElementById("vidPrompt").value);
+document.getElementById("btnVidAiren").onclick = requestAiren;
+document.getElementById("btnVidClose").onclick = ()=> document.getElementById("vidOverlay").classList.remove("show");
+document.getElementById("vidOverlay").onclick = e=>{ if(e.target.id==="vidOverlay") document.getElementById("vidOverlay").classList.remove("show"); };
+// 编辑弹窗里的入口：按弹窗表单生成提示词
+document.getElementById("btnAiImg").onclick = ()=>{
+  const t = {
+    desc: document.getElementById("fDesc").value.trim(),
+    char: document.getElementById("fChar").value.trim(),
+    jingbie: document.getElementById("fJingbie").value,
+    angle: document.getElementById("fAngle").value,
+    move: document.getElementById("fMove").value
+  };
+  aiTargetId = editingId;
+  document.getElementById("aiPrompt").value = buildPrompt(t);
+  document.getElementById("imgPrevWrap").style.display="none";
+  document.getElementById("genHint").style.display="block";
+  document.getElementById("genHint").textContent = "点「生成」通过免费在线接口出图（无需密钥，约 10-30 秒）。也可复制提示词交给可灵 / 即梦 / Midjourney 等工具出图。";
+  document.getElementById("aiOverlay").classList.add("show");
+};
+
+
+// ESC 关闭弹窗
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ closeModal(); document.getElementById("aiOverlay").classList.remove("show"); document.getElementById("vidOverlay").classList.remove("show"); document.getElementById("assetsOverlay").classList.remove("show"); document.getElementById("promptLib").classList.remove("open"); } });
+
+// 启动
+load(); render(); renderPromptLib();
+</script>
+</body>
+</html>
